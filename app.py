@@ -40,8 +40,6 @@ WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL
 GROUP BY STATE, CATEGORY
 """)
 df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT"])
-cur.close()
-conn.close()
 
 # Total per state
 totals = df.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index(name="TOTAL_COUNT")
@@ -65,8 +63,39 @@ fig = px.choropleth(
     hover_name="STATE",
     hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_COUNT": False},
     scope="usa",
-    color_continuous_scale="OrRd",
+    color_continuous_scale="Plasma",  # More colorful than OrRd
     title="📍 Hover on a State to See CATEGORY Counts"
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+# --- New Section: Select state and show avg NEGOTIATED_RATE ---
+selected_state = st.selectbox(
+    "👇 Select a state to view average NEGOTIATED_RATE:",
+    options=data["STATE"].sort_values().unique()
+)
+
+# Reconnect to Snowflake for the second query
+conn = snowflake.connector.connect(
+    user=st.secrets["user"],
+    password=st.secrets["password"],
+    account=st.secrets["account"],
+    warehouse=st.secrets["warehouse"],
+    database=st.secrets["database"],
+    schema=st.secrets["schema"]
+)
+cur = conn.cursor()
+
+# Query average NEGOTIATED_RATE for the selected state
+cur.execute(f"""
+SELECT ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
+FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
+WHERE STATE = '{selected_state}'
+""")
+
+avg_rate = cur.fetchone()[0]
+cur.close()
+conn.close()
+
+# Display result
+st.markdown(f"📌 **Average Negotiated Rate for `{selected_state}`:** `${avg_rate}`")
