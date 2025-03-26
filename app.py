@@ -63,7 +63,7 @@ fig = px.choropleth(
     hover_name="STATE",
     hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_COUNT": False},
     scope="usa",
-    color_continuous_scale="Plasma",  # More colorful than OrRd
+    color_continuous_scale="Turbo",  # More colorful than OrRd
     title="📍 Hover on a State to See CATEGORY Counts"
 )
 
