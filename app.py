@@ -27,75 +27,63 @@ conn = snowflake.connector.connect(
     account=st.secrets["account"],
     warehouse=st.secrets["warehouse"],
     database=st.secrets["database"],
-    schema=st.secrets["schema"]
+    schema="ALL_STATES"  # 👈 updated schema for All States
 )
 
 cur = conn.cursor()
 
-# Query state + category data
+# Query state + total negotiated rate counts
 cur.execute("""
-SELECT STATE, CATEGORY, COUNT(*) AS CATEGORY_COUNT
-FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
-WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL
-GROUP BY STATE, CATEGORY
+SELECT STATE, COUNT(*) AS ENTRY_COUNT
+FROM ALL_STATE_COMBINED
+WHERE STATE IS NOT NULL
+GROUP BY STATE
 """)
-df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT"])
+df = pd.DataFrame(cur.fetchall(), columns=["STATE", "ENTRY_COUNT"])
 
-# Total per state
-totals = df.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index(name="TOTAL_COUNT")
+# Merge with state codes
+df["STATE_CODE"] = df["STATE"].map(us_state_abbr)
+df = df.dropna(subset=["STATE_CODE"])
 
-# Hover text
-hover = df.groupby("STATE").apply(
-    lambda x: "<br>".join(f"{r['CATEGORY']}: {r['CATEGORY_COUNT']}" for _, r in x.iterrows())
-).reset_index(name="HOVER_TEXT")
-
-# Merge + map
-data = totals.merge(hover, on="STATE")
-data["STATE_CODE"] = data["STATE"].map(us_state_abbr)
-data = data.dropna(subset=["STATE_CODE"])
-
-# Map plot
+# Choropleth map
 fig = px.choropleth(
-    data,
+    df,
     locations="STATE_CODE",
     locationmode="USA-states",
-    color="TOTAL_COUNT",
+    color="ENTRY_COUNT",
     hover_name="STATE",
-    hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_COUNT": False},
+    hover_data={"STATE_CODE": False, "ENTRY_COUNT": True},
     scope="usa",
-    color_continuous_scale="Turbo",  # More colorful than OrRd
-    title="📍 Hover on a State to See CATEGORY Counts"
+    color_continuous_scale="Turbo",
+    title="📍 Hover on a State to See Entry Counts in All States Dataset"
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- New Section: Select state and show avg NEGOTIATED_RATE ---
+# --- Dropdown for AVG NEGOTIATED_RATE ---
 selected_state = st.selectbox(
     "👇 Select a state to view average NEGOTIATED_RATE:",
-    options=data["STATE"].sort_values().unique()
+    options=df["STATE"].sort_values().unique()
 )
 
-# Reconnect to Snowflake for the second query
+# Reconnect for second query
 conn = snowflake.connector.connect(
     user=st.secrets["user"],
     password=st.secrets["password"],
     account=st.secrets["account"],
     warehouse=st.secrets["warehouse"],
     database=st.secrets["database"],
-    schema=st.secrets["schema"]
+    schema="ALL_STATES"
 )
 cur = conn.cursor()
 
-# Query average NEGOTIATED_RATE for the selected state
 cur.execute(f"""
 SELECT ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
-FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
+FROM ALL_STATE_COMBINED
 WHERE STATE = '{selected_state}'
 """)
-
 avg_rate = cur.fetchone()[0]
 cur.close()
 conn.close()
 
-# Display result
 st.markdown(f"📌 **Average Negotiated Rate for `{selected_state}`:** `${avg_rate}`")
