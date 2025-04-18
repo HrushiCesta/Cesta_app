@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import snowflake.connector
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
 
 # Map full state names → 2-letter codes
 us_state_abbr = {
@@ -22,50 +20,16 @@ us_state_abbr = {
     'Wisconsin': 'WI', 'Wyoming': 'WY'
 }
 
-# Correctly convert PEM private key → DER bytes
-def connect_snowflake():
-    pem_str = st.secrets["private_key"]
-    pem_bytes = pem_str.encode("utf-8")
+# Connect to Snowflake using secrets
+conn = snowflake.connector.connect(
+    user=st.secrets["user"],
+    password=st.secrets["password"],
+    account=st.secrets["account"],
+    warehouse=st.secrets["warehouse"],
+    database=st.secrets["database"],
+    schema=st.secrets["schema"]
+)
 
-    private_key = serialization.load_pem_private_key(
-        pem_bytes,
-        password=None,
-        backend=default_backend()
-    )
-
-    private_key_bytes = private_key.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
-    )
-
-    return snowflake.connector.connect(
-        user=st.secrets["user"],
-        account=st.secrets["account"],
-        private_key=private_key_bytes,
-        warehouse=st.secrets["warehouse"],
-        database=st.secrets["database"],
-        schema=st.secrets["schema"]
-    )
-
-# 🔍 Connection test block
-try:
-    conn = connect_snowflake()
-    st.success("✅ Successfully connected to Snowflake using key-pair authentication!")
-
-    cur = conn.cursor()
-    cur.execute("SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_REGION();")
-    result = cur.fetchone()
-    st.code(result)
-    cur.close()
-except Exception as e:
-    st.error(f"❌ Connection failed: {e}")
-    st.stop()  # Stop execution if connection fails
-
-# --- Main App Logic Below ---
-
-# Reconnect after test
-conn = connect_snowflake()
 cur = conn.cursor()
 
 # Query state + category data
@@ -99,22 +63,30 @@ fig = px.choropleth(
     hover_name="STATE",
     hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_COUNT": False},
     scope="usa",
-    color_continuous_scale="Turbo",
+    color_continuous_scale="Turbo",  # More colorful than OrRd
     title="📍 Hover on a State to See CATEGORY Counts"
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- Select state and show avg NEGOTIATED_RATE ---
+# --- New Section: Select state and show avg NEGOTIATED_RATE ---
 selected_state = st.selectbox(
     "👇 Select a state to view average NEGOTIATED_RATE:",
     options=data["STATE"].sort_values().unique()
 )
 
-# Reconnect and run second query
-conn = connect_snowflake()
+# Reconnect to Snowflake for the second query
+conn = snowflake.connector.connect(
+    user=st.secrets["user"],
+    password=st.secrets["password"],
+    account=st.secrets["account"],
+    warehouse=st.secrets["warehouse"],
+    database=st.secrets["database"],
+    schema=st.secrets["schema"]
+)
 cur = conn.cursor()
 
+# Query average NEGOTIATED_RATE for the selected state
 cur.execute(f"""
 SELECT ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
 FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
