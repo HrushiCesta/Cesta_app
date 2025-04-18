@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import snowflake.connector
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 # Map full state names → 2-letter codes
 us_state_abbr = {
@@ -20,17 +22,33 @@ us_state_abbr = {
     'Wisconsin': 'WI', 'Wyoming': 'WY'
 }
 
-# Connect to Snowflake using key-pair auth
+# Connect to Snowflake using PEM private key from secrets
 def connect_snowflake():
+    pem_str = st.secrets["private_key"]
+    pem_bytes = pem_str.encode("utf-8")
+
+    private_key = serialization.load_pem_private_key(
+        pem_bytes,
+        password=None,
+        backend=default_backend()
+    )
+
+    private_key_bytes = private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
     return snowflake.connector.connect(
         user=st.secrets["user"],
         account=st.secrets["account"],
-        private_key=st.secrets["private_key"].encode("utf-8"),
+        private_key=private_key_bytes,
         warehouse=st.secrets["warehouse"],
         database=st.secrets["database"],
         schema=st.secrets["schema"]
     )
 
+# Initial connection
 conn = connect_snowflake()
 cur = conn.cursor()
 
@@ -77,7 +95,7 @@ selected_state = st.selectbox(
     options=data["STATE"].sort_values().unique()
 )
 
-# Use the same connection again
+# Reuse connection
 conn = connect_snowflake()
 cur = conn.cursor()
 
