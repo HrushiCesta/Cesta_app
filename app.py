@@ -22,7 +22,7 @@ us_state_abbr = {
     'Wisconsin': 'WI', 'Wyoming': 'WY'
 }
 
-# Connect to Snowflake using PEM private key from secrets
+# Correctly convert PEM private key → DER bytes
 def connect_snowflake():
     pem_str = st.secrets["private_key"]
     pem_bytes = pem_str.encode("utf-8")
@@ -48,7 +48,23 @@ def connect_snowflake():
         schema=st.secrets["schema"]
     )
 
-# Initial connection
+# 🔍 Connection test block
+try:
+    conn = connect_snowflake()
+    st.success("✅ Successfully connected to Snowflake using key-pair authentication!")
+
+    cur = conn.cursor()
+    cur.execute("SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_REGION();")
+    result = cur.fetchone()
+    st.code(result)
+    cur.close()
+except Exception as e:
+    st.error(f"❌ Connection failed: {e}")
+    st.stop()  # Stop execution if connection fails
+
+# --- Main App Logic Below ---
+
+# Reconnect after test
 conn = connect_snowflake()
 cur = conn.cursor()
 
@@ -95,7 +111,7 @@ selected_state = st.selectbox(
     options=data["STATE"].sort_values().unique()
 )
 
-# Reuse connection
+# Reconnect and run second query
 conn = connect_snowflake()
 cur = conn.cursor()
 
