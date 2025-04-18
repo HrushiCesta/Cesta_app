@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import snowflake.connector
-import base64
 
 # Map full state names → 2-letter codes
 us_state_abbr = {
@@ -21,14 +20,12 @@ us_state_abbr = {
     'Wisconsin': 'WI', 'Wyoming': 'WY'
 }
 
-private_key_bytes = base64.b64decode(st.secrets["private_key_der_base64"])
-
 # Connect to Snowflake using key-pair auth
 def connect_snowflake():
     return snowflake.connector.connect(
         user=st.secrets["user"],
         account=st.secrets["account"],
-        private_key=private_key_bytes,
+        private_key=st.secrets["private_key"].encode("utf-8"),
         warehouse=st.secrets["warehouse"],
         database=st.secrets["database"],
         schema=st.secrets["schema"]
