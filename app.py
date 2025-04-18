@@ -63,7 +63,7 @@ fig = px.choropleth(
     hover_name="STATE",
     hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_COUNT": False},
     scope="usa",
-    color_continuous_scale="Turbo",  # More colorful than OrRd
+    color_continuous_scale="Turbo",
     title="📍 Hover on a State to See CATEGORY Counts"
 )
 
@@ -107,5 +107,5 @@ cur.close()
 conn.close()
 
 # Display result
-st.markdown(f"\ud83d\udccc **Category breakdown for `{selected_state}`**  ✨ *Average Negotiated Rate:* `${avg_rate}`")
+st.markdown(f"📌 **Category breakdown for `{selected_state}`**  ✨ *Average Negotiated Rate:* `${avg_rate}`")
 st.dataframe(category_data, use_container_width=True)
