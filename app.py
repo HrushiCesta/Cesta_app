@@ -20,16 +20,18 @@ us_state_abbr = {
     'Wisconsin': 'WI', 'Wyoming': 'WY'
 }
 
-# Connect to Snowflake using secrets
-conn = snowflake.connector.connect(
-    user=st.secrets["user"],
-    account=st.secrets["account"],
-    private_key=st.secrets["private_key"].encode("utf-8"),
-    warehouse=st.secrets["warehouse"],
-    database=st.secrets["database"],
-    schema=st.secrets["schema"]
-)
+# Connect to Snowflake using key-pair auth
+def connect_snowflake():
+    return snowflake.connector.connect(
+        user=st.secrets["user"],
+        account=st.secrets["account"],
+        private_key=st.secrets["private_key"].encode("utf-8"),
+        warehouse=st.secrets["warehouse"],
+        database=st.secrets["database"],
+        schema=st.secrets["schema"]
+    )
 
+conn = connect_snowflake()
 cur = conn.cursor()
 
 # Query state + category data
@@ -63,30 +65,22 @@ fig = px.choropleth(
     hover_name="STATE",
     hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_COUNT": False},
     scope="usa",
-    color_continuous_scale="Turbo",  # More colorful than OrRd
+    color_continuous_scale="Turbo",
     title="📍 Hover on a State to See CATEGORY Counts"
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- New Section: Select state and show avg NEGOTIATED_RATE ---
+# --- Select state and show avg NEGOTIATED_RATE ---
 selected_state = st.selectbox(
     "👇 Select a state to view average NEGOTIATED_RATE:",
     options=data["STATE"].sort_values().unique()
 )
 
-# Reconnect to Snowflake for the second query
-conn = snowflake.connector.connect(
-    user=st.secrets["user"],
-    password=st.secrets["password"],
-    account=st.secrets["account"],
-    warehouse=st.secrets["warehouse"],
-    database=st.secrets["database"],
-    schema=st.secrets["schema"]
-)
+# Use the same connection again
+conn = connect_snowflake()
 cur = conn.cursor()
 
-# Query average NEGOTIATED_RATE for the selected state
 cur.execute(f"""
 SELECT ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
 FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
