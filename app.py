@@ -94,11 +94,18 @@ WHERE STATE = '{selected_state}' AND CATEGORY IS NOT NULL
 GROUP BY CATEGORY
 ORDER BY CATEGORY_COUNT DESC
 """)
-
 category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUNT"])
+
+# Query average negotiated rate for the state
+cur.execute(f"""
+SELECT ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
+FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
+WHERE STATE = '{selected_state}'
+""")
+avg_rate = cur.fetchone()[0]
 cur.close()
 conn.close()
 
 # Display result
-st.markdown(f"📌 **Category breakdown for `{selected_state}`:**")
+st.markdown(f"\ud83d\udccc **Category breakdown for `{selected_state}`**  ✨ *Average Negotiated Rate:* `${avg_rate}`")
 st.dataframe(category_data, use_container_width=True)
