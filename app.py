@@ -23,8 +23,8 @@ us_state_abbr = {
 # Connect to Snowflake using secrets
 conn = snowflake.connector.connect(
     user=st.secrets["user"],
-    password=st.secrets["password"],
     account=st.secrets["account"],
+    private_key=st.secrets["private_key"].encode("utf-8"),
     warehouse=st.secrets["warehouse"],
     database=st.secrets["database"],
     schema=st.secrets["schema"]
