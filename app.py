@@ -107,15 +107,15 @@ conn = snowflake.connector.connect(
 )
 cur = conn.cursor()
 
-# Get category breakdown
+# Get category breakdown with avg negotiated rate
 cur.execute(f"""
-SELECT CATEGORY, COUNT(*) AS CATEGORY_COUNT
+SELECT CATEGORY, COUNT(*) AS CATEGORY_COUNT, ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_RATE
 FROM ALL_STATE_COMBINED
 WHERE STATE = '{selected_state}' AND CATEGORY IS NOT NULL
 GROUP BY CATEGORY
 ORDER BY CATEGORY_COUNT DESC
 """)
-category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUNT"])
+category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUNT", "AVG_NEGOTIATED_RATE"])
 
 # Get average negotiated rate
 cur.execute(f"""
