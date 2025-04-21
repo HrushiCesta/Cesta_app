@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import snowflake.connector
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 # Map full state names → 2-letter codes
 us_state_abbr = {
@@ -20,19 +22,34 @@ us_state_abbr = {
     'Wisconsin': 'WI', 'Wyoming': 'WY'
 }
 
-# Connect to Snowflake using secrets
-conn = snowflake.connector.connect(
-    user=st.secrets["user"],
-    password=st.secrets["password"],
-    account=st.secrets["account"],
-    warehouse=st.secrets["warehouse"],
-    database=st.secrets["database"],
-    schema="ALL_STATES"
+# Load private key from secrets
+private_key = serialization.load_pem_private_key(
+    st.secrets["private_key"].encode(),
+    password=None,  # or b"your_passphrase" if the key is encrypted
+    backend=default_backend()
 )
 
+private_key_bytes = private_key.private_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption()
+)
+
+# Function to connect to Snowflake
+def connect_to_snowflake():
+    return snowflake.connector.connect(
+        user=st.secrets["user"],
+        account=st.secrets["account"],
+        private_key=private_key_bytes,
+        warehouse=st.secrets["warehouse"],
+        database=st.secrets["database"],
+        schema=st.secrets["schema"]
+    )
+
+# Connect and query state + category data
+conn = connect_to_snowflake()
 cur = conn.cursor()
 
-# Query state + category data
 cur.execute("""
 SELECT STATE, CATEGORY, COUNT(*) AS CATEGORY_COUNT
 FROM ALL_STATE_COMBINED
@@ -75,15 +92,7 @@ selected_state = st.selectbox(
     options=data["STATE"].sort_values().unique()
 )
 
-# Reconnect to Snowflake for the second query
-conn = snowflake.connector.connect(
-    user=st.secrets["user"],
-    password=st.secrets["password"],
-    account=st.secrets["account"],
-    warehouse=st.secrets["warehouse"],
-    database=st.secrets["database"],
-    schema="ALL_STATES"
-)
+# Reuse the same connection
 cur = conn.cursor()
 
 # Query category breakdown for the selected state
