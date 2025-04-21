@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import snowflake.connector
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
 
 # Map full state names → 2-letter codes
 us_state_abbr = {
@@ -22,34 +20,19 @@ us_state_abbr = {
     'Wisconsin': 'WI', 'Wyoming': 'WY'
 }
 
-# Load private key from secrets
-private_key = serialization.load_pem_private_key(
-    st.secrets["private_key"].encode(),
-    password=None,  # or b"your_passphrase" if the key is encrypted
-    backend=default_backend()
+# Connect to Snowflake using secrets
+conn = snowflake.connector.connect(
+    user=st.secrets["user"],
+    password=st.secrets["password"],
+    account=st.secrets["account"],
+    warehouse=st.secrets["warehouse"],
+    database=st.secrets["database"],
+    schema="ALL_STATES"
 )
 
-private_key_bytes = private_key.private_bytes(
-    encoding=serialization.Encoding.DER,
-    format=serialization.PrivateFormat.PKCS8,
-    encryption_algorithm=serialization.NoEncryption()
-)
-
-# Function to connect to Snowflake
-def connect_to_snowflake():
-    return snowflake.connector.connect(
-        user=st.secrets["user"],
-        account=st.secrets["account"],
-        private_key=private_key_bytes,
-        warehouse=st.secrets["warehouse"],
-        database=st.secrets["database"],
-        schema=st.secrets["schema"]
-    )
-
-# Connect and query state + category data
-conn = connect_to_snowflake()
 cur = conn.cursor()
 
+# Query for category counts
 cur.execute("""
 SELECT STATE, CATEGORY, COUNT(*) AS CATEGORY_COUNT
 FROM ALL_STATE_COMBINED
@@ -58,13 +41,24 @@ GROUP BY STATE, CATEGORY
 """)
 df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT"])
 
-# Total per state
-totals = df.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index(name="TOTAL_COUNT")
+# Query for negotiated type counts
+cur.execute("""
+SELECT STATE, CATEGORY, NEGOTIATED_TYPE, COUNT(*) AS TYPE_COUNT
+FROM ALL_STATE_COMBINED
+WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL AND NEGOTIATED_TYPE IS NOT NULL
+GROUP BY STATE, CATEGORY, NEGOTIATED_TYPE
+""")
+type_df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "NEGOTIATED_TYPE", "TYPE_COUNT"])
 
-# Hover text
-hover = df.groupby("STATE").apply(
-    lambda x: "<br>".join(f"{r['CATEGORY']}: {r['CATEGORY_COUNT']}" for _, r in x.iterrows())
-).reset_index(name="HOVER_TEXT")
+# Pivot for hover text
+hover_texts = {}
+for (state, category), group in type_df.groupby(["STATE", "CATEGORY"]):
+    lines = [f"{category}:"] + [f"- {r['NEGOTIATED_TYPE']}: {r['TYPE_COUNT']}" for _, r in group.iterrows()]
+    hover_texts.setdefault(state, []).append("<br>".join(lines))
+
+# Total per state
+totals = df.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index(name="TOTAL_SUBSCRIPTIONS")
+hover = pd.DataFrame.from_dict({k: "<br><br>".join(v) for k, v in hover_texts.items()}, orient='index', columns=["HOVER_TEXT"]).reset_index().rename(columns={"index": "STATE"})
 
 # Merge + map
 data = totals.merge(hover, on="STATE")
@@ -76,9 +70,9 @@ fig = px.choropleth(
     data,
     locations="STATE_CODE",
     locationmode="USA-states",
-    color="TOTAL_COUNT",
+    color="TOTAL_SUBSCRIPTIONS",
     hover_name="STATE",
-    hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_COUNT": False},
+    hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_SUBSCRIPTIONS": False},
     scope="usa",
     color_continuous_scale="Turbo",
     title="📍 Hover on a State to See CATEGORY Counts"
@@ -86,16 +80,24 @@ fig = px.choropleth(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- New Section: Select state and show top categories ---
+# Dropdown selection
 selected_state = st.selectbox(
     "👇 Select a state to view CATEGORY breakdown:",
     options=data["STATE"].sort_values().unique()
 )
 
-# Reuse the same connection
+# Reconnect
+conn = snowflake.connector.connect(
+    user=st.secrets["user"],
+    password=st.secrets["password"],
+    account=st.secrets["account"],
+    warehouse=st.secrets["warehouse"],
+    database=st.secrets["database"],
+    schema="ALL_STATES"
+)
 cur = conn.cursor()
 
-# Query category breakdown for the selected state
+# Get category breakdown
 cur.execute(f"""
 SELECT CATEGORY, COUNT(*) AS CATEGORY_COUNT
 FROM ALL_STATE_COMBINED
@@ -105,9 +107,9 @@ ORDER BY CATEGORY_COUNT DESC
 """)
 category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUNT"])
 
-# Query average negotiated rate for the state
+# Get average negotiated rate
 cur.execute(f"""
-SELECT ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
+SELECT ROUND(AVG(NEGOTIATED_RATE), 2)
 FROM ALL_STATE_COMBINED
 WHERE STATE = '{selected_state}'
 """)
@@ -115,6 +117,15 @@ avg_rate = cur.fetchone()[0]
 cur.close()
 conn.close()
 
-# Display result
+# Display
 st.markdown(f"📌 **Category breakdown for `{selected_state}`**  ✨ *Average Negotiated Rate:* `${avg_rate}`")
 st.dataframe(category_data, use_container_width=True)
+
+# Legend for negotiated type
+st.markdown("### 📘 Negotiated Type Legend")
+st.markdown("""
+- **negotiated**: A fixed, direct amount agreed upon (e.g., $53.25)
+- **percentage**: A percentage of billed charges (e.g., 80%)
+- **per diem**: A daily rate (e.g., $500 per day)
+- **derived**: Estimated from other values
+""")
