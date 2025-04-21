@@ -27,7 +27,7 @@ conn = snowflake.connector.connect(
     account=st.secrets["account"],
     warehouse=st.secrets["warehouse"],
     database=st.secrets["database"],
-    schema=st.secrets["schema"]
+    schema="ALL_STATES"
 )
 
 cur = conn.cursor()
@@ -35,7 +35,7 @@ cur = conn.cursor()
 # Query state + category data
 cur.execute("""
 SELECT STATE, CATEGORY, COUNT(*) AS CATEGORY_COUNT
-FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
+FROM ALL_STATE_COMBINED
 WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL
 GROUP BY STATE, CATEGORY
 """)
@@ -82,14 +82,14 @@ conn = snowflake.connector.connect(
     account=st.secrets["account"],
     warehouse=st.secrets["warehouse"],
     database=st.secrets["database"],
-    schema=st.secrets["schema"]
+    schema="ALL_STATES"
 )
 cur = conn.cursor()
 
 # Query category breakdown for the selected state
 cur.execute(f"""
 SELECT CATEGORY, COUNT(*) AS CATEGORY_COUNT
-FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
+FROM ALL_STATE_COMBINED
 WHERE STATE = '{selected_state}' AND CATEGORY IS NOT NULL
 GROUP BY CATEGORY
 ORDER BY CATEGORY_COUNT DESC
@@ -99,7 +99,7 @@ category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUN
 # Query average negotiated rate for the state
 cur.execute(f"""
 SELECT ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
-FROM MEDFAIR_DATABASE.PUBLIC.PROCESSED_MASTER_FILE_CATEGORY
+FROM ALL_STATE_COMBINED
 WHERE STATE = '{selected_state}'
 """)
 avg_rate = cur.fetchone()[0]
