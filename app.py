@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 
@@ -142,13 +141,10 @@ conn.close()
 st.markdown(f"📌 **Category breakdown for `{selected_state}`**  ✨ *Average Negotiated Rate:* `${avg_rate}`")
 st.dataframe(category_data, use_container_width=True)
 
-# Show negotiated type breakdown
+# Show negotiated type breakdown (formatted better)
 st.markdown("### 🔍 Negotiated Type Breakdown by Category")
-if not type_breakdown.empty:
-    pivot = type_breakdown.pivot(index="CATEGORY", columns="NEGOTIATED_TYPE", values="TYPE_COUNT").fillna(0)
-    st.bar_chart(pivot)
-else:
-    st.write("No data available for negotiated types.")
+type_pivot = type_breakdown.pivot(index="CATEGORY", columns="NEGOTIATED_TYPE", values="TYPE_COUNT").fillna(0).astype(int)
+st.dataframe(type_pivot.reset_index(), use_container_width=True)
 
 # Legend for negotiated type
 st.markdown("### 📘 Negotiated Type Legend")
