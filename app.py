@@ -124,12 +124,26 @@ FROM ALL_STATE_COMBINED
 WHERE STATE = '{selected_state}'
 """)
 avg_rate = cur.fetchone()[0]
+
+# Get negotiated type breakdown for the selected state
+cur.execute(f"""
+SELECT CATEGORY, NEGOTIATED_TYPE, COUNT(*) AS TYPE_COUNT
+FROM ALL_STATE_COMBINED
+WHERE STATE = '{selected_state}' AND CATEGORY IS NOT NULL AND NEGOTIATED_TYPE IS NOT NULL
+GROUP BY CATEGORY, NEGOTIATED_TYPE
+ORDER BY CATEGORY, NEGOTIATED_TYPE
+""")
+type_breakdown = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "NEGOTIATED_TYPE", "TYPE_COUNT"])
 cur.close()
 conn.close()
 
 # Display
 st.markdown(f"📌 **Category breakdown for `{selected_state}`**  ✨ *Average Negotiated Rate:* `${avg_rate}`")
 st.dataframe(category_data, use_container_width=True)
+
+# Show negotiated type breakdown
+st.markdown("### 🔍 Negotiated Type Breakdown by Category")
+st.dataframe(type_breakdown, use_container_width=True)
 
 # Legend for negotiated type
 st.markdown("### 📘 Negotiated Type Legend")
