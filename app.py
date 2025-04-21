@@ -116,6 +116,7 @@ GROUP BY CATEGORY
 ORDER BY CATEGORY_COUNT DESC
 """)
 category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUNT", "AVG_NEGOTIATED_RATE"])
+category_data["AVG_NEGOTIATED_RATE"] = category_data["AVG_NEGOTIATED_RATE"].apply(lambda x: f"${x:,.2f}")
 
 # Get average negotiated rate
 cur.execute(f"""
