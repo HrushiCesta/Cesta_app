@@ -62,7 +62,7 @@ if section == "Home":
         👉 Use the sidebar to explore the full analytics.
     """)
     st.markdown("---")
-    st.page_link("#", label="📊 View Analytics →", icon="📈")
+    st.markdown("[📊 View Analytics →](#)")
 
 # --- HEATMAP OVERVIEW ---
 elif section == "Heatmap Overview":
