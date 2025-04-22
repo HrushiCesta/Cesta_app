@@ -63,7 +63,7 @@ if section == "Home":
     """)
     st.markdown("---")
 
-# --- HEATMAP OVERVIEW ---
+# --- TOTAL TESTOSTERONE RECORDS ---
 elif section == "Heatmap Overview":
     conn = get_connection()
     cur = conn.cursor()
@@ -78,11 +78,10 @@ elif section == "Heatmap Overview":
     df["STATE_CODE"] = df["STATE"].map(us_state_abbr)
     df = df.dropna(subset=["STATE_CODE"])
 
-    st.title("🧾 Heatmap Overview")
+    st.title("📊 Total Testosterone Records Across the U.S.")
     st.markdown("""
-    This heatmap shows how many testosterone-related entries are recorded across states.
+    This heatmap shows how many testosterone-related entries we’ve collected in each U.S. state.
     """)
-
     fig = px.choropleth(
         df,
         locations="STATE_CODE",
