@@ -103,20 +103,17 @@ elif section == "Category Analytics":
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT STATE, CATEGORY, COUNT(*) AS CATEGORY_COUNT, ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_NEGOTIATED_RATE
+        SELECT STATE, CATEGORY, COUNT(*) AS CATEGORY_COUNT
         FROM ALL_STATE_COMBINED
         WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL
         GROUP BY STATE, CATEGORY
     """)
-    cat_data = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT", "AVG_NEGOTIATED_RATE"])
+    cat_data = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT"])
 
     # Aggregate for heatmap display
     state_summary = cat_data.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index()
     state_summary["STATE_CODE"] = state_summary["STATE"].map(us_state_abbr)
     state_summary = state_summary.dropna(subset=["STATE_CODE"])
-
-    hover_text = cat_data.apply(lambda r: f"{r['CATEGORY']}<br>Avg Rate: ${r['AVG_NEGOTIATED_RATE']:.2f}<br>Count: {r['CATEGORY_COUNT']:,}", axis=1)
-    cat_data["HOVER"] = hover_text
 
     st.title("📦 Category Analytics - Nationwide View")
     fig = px.choropleth(
@@ -126,33 +123,26 @@ elif section == "Category Analytics":
         color="CATEGORY_COUNT",
         color_continuous_scale="Blues",
         hover_name="STATE",
-        hover_data={"HOVER": True, "STATE_CODE": False, "CATEGORY_COUNT": False},
+        hover_data={"STATE_CODE": False, "CATEGORY_COUNT": True},
         scope="usa",
-        title="📍 Category Counts by State"
+        title="📍 Total Category Subscriptions by State"
     )
     st.plotly_chart(fig, use_container_width=True)
 
+    # Dropdown for detailed state view
     states = pd.read_sql("SELECT DISTINCT STATE FROM ALL_STATE_COMBINED WHERE STATE IS NOT NULL ORDER BY STATE", conn)
     selected_state = st.selectbox("👇 Select a state to view detailed CATEGORY breakdown:", states["STATE"])
 
     cur.execute(f"""
-        SELECT CATEGORY, COUNT(*) AS CATEGORY_COUNT, ROUND(AVG(NEGOTIATED_RATE), 2) AS AVG_RATE
+        SELECT CATEGORY, COUNT(*) AS CATEGORY_COUNT
         FROM ALL_STATE_COMBINED
         WHERE STATE = '{selected_state}' AND CATEGORY IS NOT NULL
         GROUP BY CATEGORY
         ORDER BY CATEGORY_COUNT DESC
     """)
-    category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUNT", "AVG_NEGOTIATED_RATE"])
-    category_data["AVG_NEGOTIATED_RATE"] = category_data["AVG_NEGOTIATED_RATE"].apply(lambda x: f"${x:,.2f}")
+    category_data = pd.DataFrame(cur.fetchall(), columns=["CATEGORY", "CATEGORY_COUNT"])
 
-    cur.execute(f"""
-        SELECT ROUND(AVG(NEGOTIATED_RATE), 2)
-        FROM ALL_STATE_COMBINED
-        WHERE STATE = '{selected_state}'
-    """)
-    avg_rate = cur.fetchone()[0]
-
-    st.markdown(f"📌 **Detailed breakdown for `{selected_state}`** ✨ *Statewide Avg. Negotiated Rate:* `${avg_rate}`")
+    st.markdown(f"📌 **Detailed breakdown for `{selected_state}`**")
     st.dataframe(category_data, use_container_width=True)
 
 # --- NEGOTIATED TYPE BREAKDOWN ---
