@@ -4,7 +4,7 @@ import plotly.express as px
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 
-st.set_page_config(page_title="Kaiser Permanente Analysis Dashboard", layout="wide")
+st.set_page_config(page_title="Kaiser Permanente Cost Analysis Dashboard", layout="wide")
 
 # Sidebar navigation
 st.sidebar.title("🔎 Navigation")
@@ -66,48 +66,12 @@ if section == "Home":
 
 # --- HEATMAP OVERVIEW ---
 elif section == "Heatmap Overview":
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT STATE, CATEGORY, COUNT(*) AS CATEGORY_COUNT
-        FROM ALL_STATE_COMBINED
-        WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL
-        GROUP BY STATE, CATEGORY
+    st.title("🧾 Heatmap Overview")
+    st.markdown("""
+    This section gives an overview of how many testosterone-related medical entries were processed across different states. 
+
+    Use the navigation to view more detailed analytics by category or negotiated rate types.
     """)
-    df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT"])
-
-    cur.execute("""
-        SELECT STATE, CATEGORY, NEGOTIATED_TYPE, COUNT(*) AS TYPE_COUNT
-        FROM ALL_STATE_COMBINED
-        WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL AND NEGOTIATED_TYPE IS NOT NULL
-        GROUP BY STATE, CATEGORY, NEGOTIATED_TYPE
-    """)
-    type_df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "NEGOTIATED_TYPE", "TYPE_COUNT"])
-
-    hover_texts = {}
-    for (state, category), group in type_df.groupby(["STATE", "CATEGORY"]):
-        lines = [f"{category}:"] + [f"- {r['NEGOTIATED_TYPE']}: {r['TYPE_COUNT']}" for _, r in group.iterrows()]
-        hover_texts.setdefault(state, []).append("<br>".join(lines))
-
-    totals = df.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index(name="TOTAL_SUBSCRIPTIONS")
-    hover = pd.DataFrame.from_dict({k: "<br><br>".join(v) for k, v in hover_texts.items()}, orient='index', columns=["HOVER_TEXT"]).reset_index().rename(columns={"index": "STATE"})
-    data = totals.merge(hover, on="STATE")
-    data["STATE_CODE"] = data["STATE"].map(us_state_abbr)
-    data = data.dropna(subset=["STATE_CODE"])
-
-    st.title("🗺️ Nationwide Heatmap")
-    fig = px.choropleth(
-        data,
-        locations="STATE_CODE",
-        locationmode="USA-states",
-        color="TOTAL_SUBSCRIPTIONS",
-        hover_name="STATE",
-        hover_data={"HOVER_TEXT": True, "STATE_CODE": False, "TOTAL_SUBSCRIPTIONS": False},
-        scope="usa",
-        color_continuous_scale="Turbo",
-        title="📍 Hover on a State to See CATEGORY Counts"
-    )
-    st.plotly_chart(fig, use_container_width=True)
 
 # --- CATEGORY ANALYTICS ---
 elif section == "Category Analytics":
@@ -133,6 +97,9 @@ elif section == "Category Analytics":
         locations="STATE_CODE",
         locationmode="USA-states",
         color="CATEGORY_COUNT",
+        color_continuous_scale="Blues",
+        hover_name="STATE",
+        hover_data={"HOVER": True, "STATE_CODE": False, "CATEGORY_COUNT": False},
         hover_name="STATE",
         hover_data={"HOVER": True, "STATE_CODE": False, "CATEGORY_COUNT": False},
         scope="usa",
@@ -169,6 +136,31 @@ elif section == "Negotiated Type Breakdown":
     conn = get_connection()
     cur = conn.cursor()
 
+    cur.execute("""
+        SELECT STATE, CATEGORY, NEGOTIATED_TYPE, COUNT(*) AS TYPE_COUNT
+        FROM ALL_STATE_COMBINED
+        WHERE STATE IS NOT NULL AND CATEGORY IS NOT NULL AND NEGOTIATED_TYPE IS NOT NULL
+        GROUP BY STATE, CATEGORY, NEGOTIATED_TYPE
+    """)
+    type_df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "NEGOTIATED_TYPE", "TYPE_COUNT"])
+
+    summary = type_df.groupby("STATE")["TYPE_COUNT"].sum().reset_index(name="TOTAL_NEGOTIATED_TYPE")
+    summary["STATE_CODE"] = summary["STATE"].map(us_state_abbr)
+    summary = summary.dropna(subset=["STATE_CODE"])
+
+    st.title("💰 Negotiated Type Breakdown")
+    fig = px.choropleth(
+        summary,
+        locations="STATE_CODE",
+        locationmode="USA-states",
+        color="TOTAL_NEGOTIATED_TYPE",
+        hover_name="STATE",
+        scope="usa",
+        color_continuous_scale="Purples",
+        title="📍 Total NEGOTIATED_TYPE Entries by State"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
     states = pd.read_sql("SELECT DISTINCT STATE FROM ALL_STATE_COMBINED WHERE STATE IS NOT NULL ORDER BY STATE", conn)
     selected_state = st.selectbox("Select a state:", states["STATE"])
 
@@ -183,19 +175,7 @@ elif section == "Negotiated Type Breakdown":
     type_pivot = type_breakdown.pivot(index="CATEGORY", columns="NEGOTIATED_TYPE", values="TYPE_COUNT").fillna(0).astype(int)
 
     st.markdown(f"### 🔍 Negotiated Type Breakdown for `{selected_state}`")
-    fig = px.choropleth(
-        type_breakdown.groupby("STATE").size().reset_index(name="TOTAL"),
-        locations="STATE",
-        locationmode="USA-states",
-        color="TOTAL",
-        scope="usa",
-        color_continuous_scale="Purples",
-        title="📍 Total NEGOTIATED_TYPE Entries by State"
-    )
-    st.plotly_chart(fig, use_container_width=True)
     st.dataframe(type_pivot.reset_index(), use_container_width=True)
-
-    st.markdown("### 📘 Negotiated Type Legend")
     st.markdown("""
     - **negotiated**: A fixed, direct amount agreed upon (e.g., $53.25)
     - **percentage**: A percentage of billed charges (e.g., 80%)
