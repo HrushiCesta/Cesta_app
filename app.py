@@ -154,20 +154,42 @@ elif section == "Negotiated Type Breakdown":
     """)
     type_df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "NEGOTIATED_TYPE", "TYPE_COUNT"])
 
-    summary = type_df.groupby("STATE")["TYPE_COUNT"].sum().reset_index(name="TOTAL_NEGOTIATED_TYPE")
-    summary["STATE_CODE"] = summary["STATE"].map(us_state_abbr)
-    summary = summary.dropna(subset=["STATE_CODE"])
+    # Pivot for hover info
+hover_info = type_df.pivot_table(
+    index="STATE",
+    columns="NEGOTIATED_TYPE",
+    values="TYPE_COUNT",
+    aggfunc="sum"
+).fillna(0).astype(int).reset_index()
 
-    st.title("💰 Negotiated Type Breakdown")
-    fig = px.choropleth(
-        summary,
-        locations="STATE_CODE",
-        locationmode="USA-states",
-        color="TOTAL_NEGOTIATED_TYPE",
-        hover_name="STATE",
-        scope="usa",
-        color_continuous_scale="Purples",
-        title="📍 Total NEGOTIATED_TYPE Entries by State"
+# Add total column
+hover_info["TOTAL_NEGOTIATED_TYPE"] = hover_info.drop("STATE", axis=1).sum(axis=1)
+
+# Map state codes
+hover_info["STATE_CODE"] = hover_info["STATE"].map(us_state_abbr)
+hover_info = hover_info.dropna(subset=["STATE_CODE"])
+
+# Plot
+st.title("💰 Negotiated Type Breakdown")
+fig = px.choropleth(
+    hover_info,
+    locations="STATE_CODE",
+    locationmode="USA-states",
+    color="TOTAL_NEGOTIATED_TYPE",
+    scope="usa",
+    color_continuous_scale="Purples",
+    hover_name="STATE",
+    hover_data={
+        "STATE_CODE": False,
+        "TOTAL_NEGOTIATED_TYPE": True,
+        "derived": True if "derived" in hover_info.columns else False,
+        "negotiated": True if "negotiated" in hover_info.columns else False,
+        "percentage": True if "percentage" in hover_info.columns else False,
+        "per diem": True if "per diem" in hover_info.columns else False
+    },
+    title="📍 Total NEGOTIATED_TYPE Entries by State"
+)
+st.plotly_chart(fig, use_container_width=True)
     )
     st.plotly_chart(fig, use_container_width=True)
 
