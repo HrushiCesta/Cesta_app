@@ -62,7 +62,6 @@ if section == "Home":
         👉 Use the sidebar to explore the full analytics.
     """)
     st.markdown("---")
-    
 
 # --- HEATMAP OVERVIEW ---
 elif section == "Heatmap Overview":
@@ -110,7 +109,6 @@ elif section == "Category Analytics":
     """)
     cat_data = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT"])
 
-    # Aggregate for heatmap display
     state_summary = cat_data.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index()
     state_summary["STATE_CODE"] = state_summary["STATE"].map(us_state_abbr)
     state_summary = state_summary.dropna(subset=["STATE_CODE"])
@@ -129,7 +127,6 @@ elif section == "Category Analytics":
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Dropdown for detailed state view
     states = pd.read_sql("SELECT DISTINCT STATE FROM ALL_STATE_COMBINED WHERE STATE IS NOT NULL ORDER BY STATE", conn)
     selected_state = st.selectbox("👇 Select a state to view detailed CATEGORY breakdown:", states["STATE"])
 
@@ -146,32 +143,6 @@ elif section == "Category Analytics":
     st.dataframe(category_data, use_container_width=True)
 
 # --- NEGOTIATED TYPE BREAKDOWN ---
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT STATE, COUNT(*) AS ENTRY_COUNT
-        FROM ALL_STATE_COMBINED
-        WHERE STATE IS NOT NULL
-        GROUP BY STATE
-    """)
-    df = pd.DataFrame(cur.fetchall(), columns=["STATE", "ENTRY_COUNT"])
-    df["STATE_CODE"] = df["STATE"].map(us_state_abbr)
-    df = df.dropna(subset=["STATE_CODE"])
-
-    st.title("💰 Negotiated Type Breakdown")
-    fig = px.choropleth(
-        df,
-        locations="STATE_CODE",
-        locationmode="USA-states",
-        color="ENTRY_COUNT",
-        hover_name="STATE",
-        hover_data={"STATE_CODE": False, "ENTRY_COUNT": True},
-        scope="usa",
-        color_continuous_scale="Turbo",
-        title="📍 Total Testosterone-Related Entries by State"
-    )
-    st.plotly_chart(fig, use_container_width=True)
 elif section == "Negotiated Type Breakdown":
     conn = get_connection()
     cur = conn.cursor()
@@ -217,8 +188,8 @@ elif section == "Negotiated Type Breakdown":
     st.markdown(f"### 🔍 Negotiated Type Breakdown for `{selected_state}`")
     st.dataframe(type_pivot.reset_index(), use_container_width=True)
     st.markdown("""
-    - **negotiated**: A fixed, direct amount agreed upon (e.g., $53.25)
-    - **percentage**: A percentage of billed charges (e.g., 80%)
-    - **per diem**: A daily rate (e.g., $500 per day)
-    - **derived**: Estimated from other values
+    - **negotiated**: A fixed, direct amount agreed upon (e.g., $53.25)  
+    - **percentage**: A percentage of billed charges (e.g., 80%)  
+    - **per diem**: A daily rate (e.g., $500 per day)  
+    - **derived**: Estimated from other values  
     """)
