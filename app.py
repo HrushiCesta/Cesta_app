@@ -100,10 +100,7 @@ elif section == "Category Analytics":
         color_continuous_scale="Blues",
         hover_name="STATE",
         hover_data={"HOVER": True, "STATE_CODE": False, "CATEGORY_COUNT": False},
-        hover_name="STATE",
-        hover_data={"HOVER": True, "STATE_CODE": False, "CATEGORY_COUNT": False},
         scope="usa",
-        color_continuous_scale="Blues",
         title="📍 Category Counts by State"
     )
     st.plotly_chart(fig, use_container_width=True)
