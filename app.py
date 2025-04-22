@@ -64,7 +64,7 @@ if section == "Home":
     st.markdown("---")
 
 # --- HEATMAP OVERVIEW ---
-elif section == "Heatmap Overview":
+elif section == "Testosterone Records Across the U.S":
     conn = get_connection()
     cur = conn.cursor()
 
