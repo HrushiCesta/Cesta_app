@@ -109,15 +109,18 @@ elif section == "Category Analytics":
         GROUP BY STATE, CATEGORY
     """)
     cat_data = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "CATEGORY_COUNT", "AVG_NEGOTIATED_RATE"])
-    cat_data["STATE_CODE"] = cat_data["STATE"].map(us_state_abbr)
-    cat_data = cat_data.dropna(subset=["STATE_CODE"])
+
+    # Aggregate for heatmap display
+    state_summary = cat_data.groupby("STATE")["CATEGORY_COUNT"].sum().reset_index()
+    state_summary["STATE_CODE"] = state_summary["STATE"].map(us_state_abbr)
+    state_summary = state_summary.dropna(subset=["STATE_CODE"])
 
     hover_text = cat_data.apply(lambda r: f"{r['CATEGORY']}<br>Avg Rate: ${r['AVG_NEGOTIATED_RATE']:.2f}<br>Count: {r['CATEGORY_COUNT']:,}", axis=1)
     cat_data["HOVER"] = hover_text
 
     st.title("📦 Category Analytics - Nationwide View")
     fig = px.choropleth(
-        cat_data,
+        state_summary,
         locations="STATE_CODE",
         locationmode="USA-states",
         color="CATEGORY_COUNT",
