@@ -66,12 +66,36 @@ if section == "Home":
 
 # --- HEATMAP OVERVIEW ---
 elif section == "Heatmap Overview":
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT STATE, COUNT(*) AS ENTRY_COUNT
+        FROM ALL_STATE_COMBINED
+        WHERE STATE IS NOT NULL
+        GROUP BY STATE
+    """)
+    df = pd.DataFrame(cur.fetchall(), columns=["STATE", "ENTRY_COUNT"])
+    df["STATE_CODE"] = df["STATE"].map(us_state_abbr)
+    df = df.dropna(subset=["STATE_CODE"])
+
     st.title("🧾 Heatmap Overview")
     st.markdown("""
-    This section gives an overview of how many testosterone-related medical entries were processed across different states. 
-
-    Use the navigation to view more detailed analytics by category or negotiated rate types.
+    This heatmap shows how many testosterone-related entries are recorded across states.
     """)
+
+    fig = px.choropleth(
+        df,
+        locations="STATE_CODE",
+        locationmode="USA-states",
+        color="ENTRY_COUNT",
+        hover_name="STATE",
+        hover_data={"STATE_CODE": False, "ENTRY_COUNT": True},
+        scope="usa",
+        color_continuous_scale="Turbo",
+        title="📍 Total Testosterone-Related Entries by State"
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 # --- CATEGORY ANALYTICS ---
 elif section == "Category Analytics":
@@ -129,6 +153,32 @@ elif section == "Category Analytics":
     st.dataframe(category_data, use_container_width=True)
 
 # --- NEGOTIATED TYPE BREAKDOWN ---
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT STATE, COUNT(*) AS ENTRY_COUNT
+        FROM ALL_STATE_COMBINED
+        WHERE STATE IS NOT NULL
+        GROUP BY STATE
+    """)
+    df = pd.DataFrame(cur.fetchall(), columns=["STATE", "ENTRY_COUNT"])
+    df["STATE_CODE"] = df["STATE"].map(us_state_abbr)
+    df = df.dropna(subset=["STATE_CODE"])
+
+    st.title("💰 Negotiated Type Breakdown")
+    fig = px.choropleth(
+        df,
+        locations="STATE_CODE",
+        locationmode="USA-states",
+        color="ENTRY_COUNT",
+        hover_name="STATE",
+        hover_data={"STATE_CODE": False, "ENTRY_COUNT": True},
+        scope="usa",
+        color_continuous_scale="Turbo",
+        title="📍 Total Testosterone-Related Entries by State"
+    )
+    st.plotly_chart(fig, use_container_width=True)
 elif section == "Negotiated Type Breakdown":
     conn = get_connection()
     cur = conn.cursor()
