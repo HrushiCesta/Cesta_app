@@ -155,44 +155,43 @@ elif section == "Negotiated Type Breakdown":
     type_df = pd.DataFrame(cur.fetchall(), columns=["STATE", "CATEGORY", "NEGOTIATED_TYPE", "TYPE_COUNT"])
 
     # Pivot for hover info
-hover_info = type_df.pivot_table(
-    index="STATE",
-    columns="NEGOTIATED_TYPE",
-    values="TYPE_COUNT",
-    aggfunc="sum"
-).fillna(0).astype(int).reset_index()
+    hover_info = type_df.pivot_table(
+        index="STATE",
+        columns="NEGOTIATED_TYPE",
+        values="TYPE_COUNT",
+        aggfunc="sum"
+    ).fillna(0).astype(int).reset_index()
 
-# Add total column
-hover_info["TOTAL_NEGOTIATED_TYPE"] = hover_info.drop("STATE", axis=1).sum(axis=1)
+    # Add total column
+    hover_info["TOTAL_NEGOTIATED_TYPE"] = hover_info.drop("STATE", axis=1).sum(axis=1)
 
-# Map state codes
-hover_info["STATE_CODE"] = hover_info["STATE"].map(us_state_abbr)
-hover_info = hover_info.dropna(subset=["STATE_CODE"])
+    # Map state codes
+    hover_info["STATE_CODE"] = hover_info["STATE"].map(us_state_abbr)
+    hover_info = hover_info.dropna(subset=["STATE_CODE"])
 
-# Plot
-st.title("💰 Negotiated Type Breakdown")
-fig = px.choropleth(
-    hover_info,
-    locations="STATE_CODE",
-    locationmode="USA-states",
-    color="TOTAL_NEGOTIATED_TYPE",
-    scope="usa",
-    color_continuous_scale="Purples",
-    hover_name="STATE",
-    hover_data={
-        "STATE_CODE": False,
-        "TOTAL_NEGOTIATED_TYPE": True,
-        "derived": True if "derived" in hover_info.columns else False,
-        "negotiated": True if "negotiated" in hover_info.columns else False,
-        "percentage": True if "percentage" in hover_info.columns else False,
-        "per diem": True if "per diem" in hover_info.columns else False
-    },
-    title="📍 Total NEGOTIATED_TYPE Entries by State"
-)
-st.plotly_chart(fig, use_container_width=True)
+    # Plot
+    st.title("💰 Negotiated Type Breakdown")
+    fig = px.choropleth(
+        hover_info,
+        locations="STATE_CODE",
+        locationmode="USA-states",
+        color="TOTAL_NEGOTIATED_TYPE",
+        scope="usa",
+        color_continuous_scale="Purples",
+        hover_name="STATE",
+        hover_data={
+            "STATE_CODE": False,
+            "TOTAL_NEGOTIATED_TYPE": True,
+            "derived": True if "derived" in hover_info.columns else False,
+            "negotiated": True if "negotiated" in hover_info.columns else False,
+            "percentage": True if "percentage" in hover_info.columns else False,
+            "per diem": True if "per diem" in hover_info.columns else False
+        },
+        title="📍 Total NEGOTIATED_TYPE Entries by State"
     )
     st.plotly_chart(fig, use_container_width=True)
 
+    # State selector for detailed breakdown
     states = pd.read_sql("SELECT DISTINCT STATE FROM ALL_STATE_COMBINED WHERE STATE IS NOT NULL ORDER BY STATE", conn)
     selected_state = st.selectbox("Select a state:", states["STATE"])
 
@@ -214,3 +213,4 @@ st.plotly_chart(fig, use_container_width=True)
     - **per diem**: A daily rate (e.g., $500 per day)  
     - **derived**: Estimated from other values  
     """)
+
